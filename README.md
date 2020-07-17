@@ -52,14 +52,14 @@ out, aux_loss = moe(inputs) # (4, 1024, 512), (1,)
 
 ```python
 import torch
-from mixture_of_experts import MoE
+from mixture_of_experts import HeirarchicalMoE
 
-moe = MoE(
-    dim = 1024,
-    num_experts = 128
+moe = HeirarchicalMoE(
+    dim = 512,
+    num_experts = (22, 22)
 ).cuda()
 
-inputs = torch.randn(1, 1024, 1024).cuda()
+inputs = torch.randn(1, 1024, 512).cuda()
 out, aux_loss = moe(inputs)
 
 total_params = sum(p.numel() for p in moe.parameters())
