@@ -18,8 +18,13 @@ def top1(t):
     values, index = map(lambda x: x.squeeze(dim=-1), (values, index))
     return values, index
 
-def cumsum_exclusive(t):
-    return F.pad(t, (0, 0, 1, 0)).cumsum(dim=-2)[..., :-1, :]
+def cumsum_exclusive(t, dim=-1):
+    num_dims = len(t.shape)
+    num_pad_dims = - dim - 1
+    pre_padding = (0, 0) * num_pad_dims
+    pre_slice   = (slice(None),) * num_pad_dims
+    padded_t = F.pad(t, (*pre_padding, 1, 0)).cumsum(dim=dim)
+    return padded_t[(..., slice(None, -1), *pre_slice)]
 
 def cast_tuple(el):
     return el if isinstance(el, tuple) else (el,)
@@ -122,6 +127,7 @@ class Top2Gating(nn.Module):
             mask_2 *= greater_zero_mask[..., None]
             del greater_zero_mask
 
+        # normalize top2 gate scores
         denom = gate_1 + gate_2 + self.eps
         gate_1 /= denom
         gate_2 /= denom
@@ -157,7 +163,7 @@ class Top2Gating(nn.Module):
         # COMPUTE ASSIGNMENT TO EXPERTS
         # [batch, group, experts]
         # This is the position within the expert's mini-batch for this sequence
-        position_in_expert_1 = cumsum_exclusive(mask_1) * mask_1
+        position_in_expert_1 = cumsum_exclusive(mask_1, dim=-2) * mask_1
         # Remove the elements that don't fit. [batch, group, experts]
         mask_1 *= (position_in_expert_1 < expert_capacity_f).float()
         # [batch, experts]
@@ -170,7 +176,7 @@ class Top2Gating(nn.Module):
         # Weight assigned to first expert.  [batch, group]
         gate_1 *= mask_1_flat
 
-        position_in_expert_2 = cumsum_exclusive(mask_2) + mask_1_count
+        position_in_expert_2 = cumsum_exclusive(mask_2, dim=-2) + mask_1_count
         position_in_expert_2 *= mask_2
         mask_2 *= (position_in_expert_2 < expert_capacity_f).float()
         mask_2_flat = mask_2.sum(dim=-1)
