@@ -15,7 +15,7 @@ import torch
 from torch import nn
 from mixture_of_experts import MoE
 
-experts = MoE(
+moe = MoE(
     dim = 512,
     num_experts = 16,               # increase the experts (# parameters) of your model without increasing computation
     hidden_dim = 512 * 4,           # size of hidden dimension in each expert, defaults to 4 * dimension
@@ -30,7 +30,7 @@ experts = MoE(
 )
 
 inputs = torch.randn(4, 1024, 512)
-out, aux_loss = experts(inputs) # (4, 1024, 512), (1,)
+out, aux_loss = moe(inputs) # (4, 1024, 512), (1,)
 ```
 
 The above should suffice for a single machine, but if you want a heirarchical mixture of experts (2 levels), as used in the GShard paper, please follow the instructions below
@@ -39,13 +39,48 @@ The above should suffice for a single machine, but if you want a heirarchical mi
 import torch
 from mixture_of_experts import HeirarchicalMoE
 
-experts = HeirarchicalMoE(
+moe = HeirarchicalMoE(
     dim = 512,
     num_experts = (4, 4),       # 4 gates on the first layer, then 4 experts on the second, equaling 16 experts
 )
 
 inputs = torch.randn(4, 1024, 512)
-out, aux_loss = experts(inputs) # (4, 1024, 512), (1,)
+out, aux_loss = moe(inputs) # (4, 1024, 512), (1,)
+```
+
+If you want some more sophisticated network for the experts, you can define your own and pass it into the `MoE` class as `experts`
+
+```python
+import torch
+from torch import nn
+from mixture_of_experts import MoE
+
+# a 3 layered MLP as the experts
+
+class Experts(nn.Module):
+    def __init__(self, dim, num_experts = 16):
+        super().__init__()
+        self.w1 = nn.Parameter(torch.randn(num_experts, dim, dim * 4))
+        self.w2 = nn.Parameter(torch.randn(num_experts, dim * 4, dim * 4))
+        self.w3 = nn.Parameter(torch.randn(num_experts, dim * 4, dim))
+        self.act = nn.LeakyReLU(inplace = True)
+
+    def forward(self, x):
+        hidden1 = self.act(torch.einsum('end,edh->enh', x, self.w1))
+        hidden2 = self.act(torch.einsum('end,edh->enh', hidden1, self.w2))
+        out = torch.einsum('end,edh->enh', hidden2, self.w3)
+        return out
+
+experts = Experts(512, num_experts = 16)
+
+moe = MoE(
+    dim = 512,
+    num_experts = 16,
+    experts = experts
+)
+
+inputs = torch.randn(4, 1024, 512)
+out, aux_loss = moe(inputs) # (4, 1024, 512), (1,)
 ```
 
 ## Citation
