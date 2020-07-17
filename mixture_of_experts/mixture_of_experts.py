@@ -51,6 +51,9 @@ class Experts(nn.Module):
         out    = torch.einsum('...nh,...hd->...nd', hidden, self.w2)
         return out
 
+# the below code is almost all transcribed from the official tensorflow version, from which the papers are written
+# https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/moe.py
+
 # gating network
 
 class Top2Gating(nn.Module):
