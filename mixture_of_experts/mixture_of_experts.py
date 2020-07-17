@@ -51,6 +51,7 @@ class Top2Gating(nn.Module):
         dim,
         num_gates,
         eps = 1e-9,
+        outer_expert_dims = tuple(),
         second_policy_train = 'random',
         second_policy_eval = 'random',
         second_threshold_train = 0.2,
@@ -61,7 +62,7 @@ class Top2Gating(nn.Module):
 
         self.eps = eps
         self.num_gates = num_gates
-        self.w_gating = nn.Linear(dim, num_gates, bias = False)
+        self.w_gating = nn.Parameter(torch.randn(*outer_expert_dims, dim, num_gates))
 
         self.second_policy_train = second_policy_train
         self.second_policy_eval = second_policy_eval
@@ -83,7 +84,8 @@ class Top2Gating(nn.Module):
             threshold = self.second_threshold_eval
             capacity_factor = self.capacity_factor_eval
 
-        raw_gates = self.w_gating(x).softmax(dim=-1)
+        raw_gates = torch.einsum('...bnd,...de->...bne', x, self.w_gating)
+        raw_gates = raw_gates.softmax(dim=-1)
 
         gate_1, index_1 = top1(raw_gates)
         mask_1 = F.one_hot(index_1, num_gates).float()
