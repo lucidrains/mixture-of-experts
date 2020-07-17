@@ -48,6 +48,24 @@ inputs = torch.randn(4, 1024, 512)
 out, aux_loss = moe(inputs) # (4, 1024, 512), (1,)
 ```
 
+1 billion parameters
+
+```python
+import torch
+from mixture_of_experts import MoE
+
+moe = MoE(
+    dim = 1024,
+    num_experts = 128
+).cuda()
+
+inputs = torch.randn(1, 1024, 1024).cuda()
+out, aux_loss = moe(inputs)
+
+total_params = sum(p.numel() for p in moe.parameters())
+print(f'number of parameters - {total_params}')
+```
+
 If you want some more sophisticated network for the experts, you can define your own and pass it into the `MoE` class as `experts`
 
 ```python
