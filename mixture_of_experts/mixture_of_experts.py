@@ -19,6 +19,9 @@ def top1(t):
 def cumsum_exclusive(t):
     return F.pad(t, (0, 0, 1, 0)).cumsum(dim=-2)[..., :-1, :]
 
+def cast_tuple(el):
+    return el if isinstance(el, tuple) else (el,)
+
 # classes
 
 class Experts(nn.Module):
@@ -30,15 +33,16 @@ class Experts(nn.Module):
         super().__init__()
 
         hidden_dim = default(hidden_dim, dim * 4)
+        num_experts = cast_tuple(num_experts)
 
-        self.w1 = nn.Parameter(torch.randn(num_experts, dim, hidden_dim))
-        self.w2 = nn.Parameter(torch.randn(num_experts, hidden_dim, dim))
+        self.w1 = nn.Parameter(torch.randn(*num_experts, dim, hidden_dim))
+        self.w2 = nn.Parameter(torch.randn(*num_experts, hidden_dim, dim))
         self.act = activation(inplace = True)
 
     def forward(self, x):
-        hidden = torch.einsum('end,edh->enh', x, self.w1)
+        hidden = torch.einsum('...nd,...dh->...nh', x, self.w1)
         hidden = self.act(hidden)
-        out    = torch.einsum('enh,ehd->end', hidden, self.w2)
+        out    = torch.einsum('...nh,...hd->...nd', hidden, self.w2)
         return out
 
 class Top2Gating(nn.Module):
@@ -118,10 +122,9 @@ class Top2Gating(nn.Module):
             mask_2 *= (gate_2 > threshold).float()
         elif policy == "random":
             probs = torch.zeros_like(gate_2).uniform_(0., 1.)
-            mask_2 *= (probs < (gate_2 / max(threshold, 1e-9))).float().unsqueeze(-1)
+            mask_2 *= (probs < (gate_2 / max(threshold, self.eps))).float().unsqueeze(-1)
         else:
             raise ValueError(f"Unknown policy {policy}")
-
         
         expert_capacity = min(group_size, int((group_size * capacity_factor) / num_gates))
         expert_capacity = max(expert_capacity, MIN_EXPERT_CAPACITY)
