@@ -37,7 +37,6 @@ The above should suffice for a single machine, but if you want a heirarchical mi
 
 ```python
 import torch
-from torch import nn
 from mixture_of_experts import HeirarchicalMoE
 
 experts = HeirarchicalMoE(
