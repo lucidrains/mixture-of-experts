@@ -22,8 +22,13 @@ def cumsum_exclusive(t):
 # classes
 
 class Experts(nn.Module):
-    def __init__(self, dim, num_experts = 16, hidden_dim = None, activation = nn.ReLU):
+    def __init__(self,
+        dim,
+        num_experts = 16,
+        hidden_dim = None,
+        activation = nn.ReLU):
         super().__init__()
+
         hidden_dim = default(hidden_dim, dim * 4)
 
         self.w1 = nn.Parameter(torch.randn(num_experts, dim, hidden_dim))
@@ -158,11 +163,19 @@ class MoE(nn.Module):
         num_experts = 16,
         hidden_dim = None,
         activation = nn.ReLU,
+        second_policy_train = 'random',
+        second_policy_eval = 'random',
+        second_threshold_train = 0.2,
+        second_threshold_eval = 0.2,
+        capacity_factor_train = 1.25,
+        capacity_factor_eval = 2.,
         loss_coef = 1e-2):
         super().__init__()
 
         self.num_experts = num_experts
-        self.gate = Top2Gating(dim, num_gates = num_experts)
+
+        gating_kwargs = {'second_policy_train': second_policy_train, 'second_policy_eval': second_policy_eval, 'second_threshold_train': second_threshold_train, 'second_threshold_eval': second_threshold_eval, 'capacity_factor_train': capacity_factor_train, 'capacity_factor_eval': capacity_factor_eval}
+        self.gate = Top2Gating(dim, num_gates = num_experts, **gating_kwargs)
         self.experts = Experts(dim, num_experts = num_experts, hidden_dim = hidden_dim, activation = activation)
         self.loss_coef = loss_coef
 
