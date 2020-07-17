@@ -15,8 +15,6 @@ import torch
 from torch import nn
 from mixture_of_experts import MoE
 
-inputs = torch.randn(4, 1024, 512)
-
 experts = MoE(
     dim = 512,
     num_experts = 16,               # increase the experts (# parameters) of your model without increasing computation
@@ -31,6 +29,23 @@ experts = MoE(
     loss_coef = 1e-2                # multiplier on the auxiliary expert balancing auxiliary loss
 )
 
+inputs = torch.randn(4, 1024, 512)
+out, aux_loss = experts(inputs) # (4, 1024, 512), (1,)
+```
+
+The above should suffice for a single machine, but if you want a heirarchical mixture of experts (2 levels), as used in the GShard paper, please follow the instructions below
+
+```python
+import torch
+from torch import nn
+from mixture_of_experts import HeirarchicalMoE
+
+experts = HeirarchicalMoE(
+    dim = 512,
+    num_experts = (4, 4),       # 4 gates on the first layer, then 4 experts on the second, equaling 16 experts
+)
+
+inputs = torch.randn(4, 1024, 512)
 out, aux_loss = experts(inputs) # (4, 1024, 512), (1,)
 ```
 

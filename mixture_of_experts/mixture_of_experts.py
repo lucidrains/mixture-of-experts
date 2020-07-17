@@ -22,6 +22,10 @@ def cumsum_exclusive(t):
 def cast_tuple(el):
     return el if isinstance(el, tuple) else (el,)
 
+def safe_one_hot(indexes, max_length):
+    max_index = indexes.max() + 1
+    return F.one_hot(indexes, max(max_index + 1, max_length))[..., :max_length]
+
 # classes
 
 class Experts(nn.Module):
@@ -72,7 +76,7 @@ class Top2Gating(nn.Module):
         self.capacity_factor_eval = capacity_factor_eval
 
     def forward(self, x, importance = None):
-        b, group_size, dim = x.shape
+        *_, b, group_size, dim = x.shape
         num_gates = self.num_gates
 
         if self.training:
@@ -93,9 +97,9 @@ class Top2Gating(nn.Module):
 
         if importance is not None:
             equals_one_mask = (importance == 1.).float()
-            mask_1 *= equals_one_mask
+            mask_1 *= equals_one_mask[..., None]
             gate_1 *= equals_one_mask
-            density_1_proxy *= equals_one_mask
+            density_1_proxy *= equals_one_mask[..., None]
             del equals_one_mask
 
         gates_without_top_1 = raw_gates * (1. - mask_1)
@@ -105,7 +109,7 @@ class Top2Gating(nn.Module):
 
         if importance is not None:
             greater_zero_mask = (importance > 0.).float()
-            mask_2 *= greater_zero_mask
+            mask_2 *= greater_zero_mask[..., None]
             del greater_zero_mask
 
         denom = gate_1 + gate_2 + self.eps
@@ -147,16 +151,16 @@ class Top2Gating(nn.Module):
 
         position_in_expert_2 = position_in_expert_2.sum(dim=-1)
         gate_2 *= mask_2_flat
-
+        
         combine_tensor = (
             gate_1[..., None, None]
             * mask_1_flat[..., None, None]
             * F.one_hot(index_1, num_gates)[..., None]
-            * F.one_hot(position_in_expert_1.long())[..., None, :expert_capacity] +
+            * safe_one_hot(position_in_expert_1.long(), expert_capacity)[..., None, :] +
             gate_2[..., None, None]
             * mask_2_flat[..., None, None]
             * F.one_hot(index_2, num_gates)[..., None]
-            * F.one_hot(position_in_expert_2.long())[..., None, :expert_capacity]
+            * safe_one_hot(position_in_expert_2.long(), expert_capacity)[..., None, :]
         )
 
         dispatch_tensor = combine_tensor.bool().to(combine_tensor)
@@ -196,3 +200,51 @@ class MoE(nn.Module):
 
         output = torch.einsum('ebcd,bnec->bnd', expert_outputs, combine_tensor)
         return output, loss * self.loss_coef
+
+class HeirarchicalMoE(nn.Module):
+    def __init__(self,
+        dim,
+        num_experts = (4, 4),
+        hidden_dim = None,
+        activation = nn.ReLU,
+        second_policy_train = 'random',
+        second_policy_eval = 'random',
+        second_threshold_train = 0.2,
+        second_threshold_eval = 0.2,
+        capacity_factor_train = 1.25,
+        capacity_factor_eval = 2.,
+        loss_coef = 1e-2):
+        super().__init__()
+
+        assert len(num_experts) == 2, 'only 2 levels of heirarchy for experts allowed for now'
+        num_experts_outer, num_experts_inner = num_experts
+        self.num_experts_outer = num_experts_outer
+        self.num_experts_inner = num_experts_inner
+
+        gating_kwargs = {'second_policy_train': second_policy_train, 'second_policy_eval': second_policy_eval, 'second_threshold_train': second_threshold_train, 'second_threshold_eval': second_threshold_eval, 'capacity_factor_train': capacity_factor_train, 'capacity_factor_eval': capacity_factor_eval}
+
+        self.gate_outer = Top2Gating(dim, num_gates = num_experts_outer, **gating_kwargs)
+        self.gate_inner = Top2Gating(dim, num_gates = num_experts_inner, outer_expert_dims = (num_experts_outer,), **gating_kwargs)
+
+        self.experts = Experts(dim, num_experts = num_experts, hidden_dim = hidden_dim, activation = activation)
+        self.loss_coef = loss_coef
+
+    def forward(self, inputs):
+        b, n, d, eo, ei = *inputs.shape, self.num_experts_outer, self.num_experts_inner
+        dispatch_tensor_outer, combine_tensor_outer, loss_outer = self.gate_outer(inputs)
+        expert_inputs_outer = torch.einsum('bnd,bnec->ebcd', inputs, dispatch_tensor_outer)
+
+        importance = combine_tensor_outer.permute(2, 0, 3, 1).sum(dim=-1)
+        importance = 0.5 * ((importance > 0.5).float() + (importance > 0.).float())
+
+        dispatch_tensor_inner, combine_tensor_inner, loss_inner = self.gate_inner(expert_inputs_outer, importance = importance)
+        expert_inputs = torch.einsum('ebnd,ebnfc->efbcd', expert_inputs_outer, dispatch_tensor_inner)
+
+        orig_shape = expert_inputs.shape
+        expert_inputs = expert_inputs.reshape(eo, ei, -1, d)
+        expert_outputs = self.experts(expert_inputs)
+        expert_outputs = expert_outputs.reshape(*orig_shape)
+
+        expert_outputs_outer = torch.einsum('efbcd,ebnfc->ebnd', expert_outputs, combine_tensor_inner)
+        output = torch.einsum('ebcd,bnec->bnd', expert_outputs_outer, combine_tensor_outer)
+        return output, (loss_outer + loss_inner) * self.loss_coef
