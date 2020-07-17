@@ -13,6 +13,11 @@ def default(val, default_val):
     default_val = default_val() if isfunction(default_val) else default_val
     return val if val is not None else default_val
 
+def cast_tuple(el):
+    return el if isinstance(el, tuple) else (el,)
+
+# tensor related helper functions
+
 def top1(t):
     values, index = t.topk(k=1, dim=-1)
     values, index = map(lambda x: x.squeeze(dim=-1), (values, index))
@@ -26,9 +31,8 @@ def cumsum_exclusive(t, dim=-1):
     padded_t = F.pad(t, (*pre_padding, 1, 0)).cumsum(dim=dim)
     return padded_t[(..., slice(None, -1), *pre_slice)]
 
-def cast_tuple(el):
-    return el if isinstance(el, tuple) else (el,)
-
+# pytorch one hot throws an error if there are out of bound indices.
+# tensorflow, in contrast, does not throw an error
 def safe_one_hot(indexes, max_length):
     max_index = indexes.max() + 1
     return F.one_hot(indexes, max(max_index + 1, max_length))[..., :max_length]
