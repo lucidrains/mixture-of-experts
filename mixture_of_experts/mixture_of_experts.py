@@ -39,6 +39,11 @@ def safe_one_hot(indexes, max_length):
     max_index = indexes.max() + 1
     return F.one_hot(indexes, max(max_index + 1, max_length))[..., :max_length]
 
+def init_(t):
+    dim = t.shape[-1]
+    std = 1 / math.sqrt(dim)
+    return t.uniform_(-std, std)
+
 # activations
 
 class GELU_(nn.Module):
@@ -60,9 +65,15 @@ class Experts(nn.Module):
         hidden_dim = default(hidden_dim, dim * 4)
         num_experts = cast_tuple(num_experts)
 
-        self.w1 = nn.Parameter(torch.randn(*num_experts, dim, hidden_dim))
-        self.w2 = nn.Parameter(torch.randn(*num_experts, hidden_dim, dim))
-        self.act = activation(inplace = True)
+        w1 = torch.zeros(*num_experts, dim, hidden_dim)
+        w2 = torch.zeros(*num_experts, hidden_dim, dim)
+
+        w1 = init_(w1)
+        w2 = init_(w2)
+
+        self.w1 = nn.Parameter(w1)
+        self.w2 = nn.Parameter(w2)
+        self.act = activation()
 
     def forward(self, x):
         hidden = torch.einsum('...nd,...dh->...nh', x, self.w1)
