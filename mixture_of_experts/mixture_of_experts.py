@@ -1,7 +1,9 @@
 import torch
 from torch import nn
-from inspect import isfunction
 import torch.nn.functional as F
+
+import math
+from inspect import isfunction
 
 # constants
 
@@ -37,6 +39,14 @@ def safe_one_hot(indexes, max_length):
     max_index = indexes.max() + 1
     return F.one_hot(indexes, max(max_index + 1, max_length))[..., :max_length]
 
+# activations
+
+class GELU_(nn.Module):
+    def forward(self, x):
+        return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+
+GELU = nn.GELU if hasattr(nn, 'GELU') else GELU_
+
 # expert class
 
 class Experts(nn.Module):
@@ -44,7 +54,7 @@ class Experts(nn.Module):
         dim,
         num_experts = 16,
         hidden_dim = None,
-        activation = nn.ReLU):
+        activation = GELU):
         super().__init__()
 
         hidden_dim = default(hidden_dim, dim * 4)

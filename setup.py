@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
   name = 'mixture-of-experts',
   packages = find_packages(),
-  version = '0.0.4',
+  version = '0.1.0',
   license='MIT',
   description = 'Sparsely-Gated Mixture of Experts for Pytorch',
   author = 'Phil Wang',
