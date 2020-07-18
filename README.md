@@ -6,6 +6,8 @@ A Pytorch implementation of Sparsely Gated <a href="https://arxiv.org/abs/2006.1
 
 It will mostly be a line-by-line transcription of the tensorflow implementation <a href="https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/moe.py">here</a>, with a few enhancements.
 
+[![PyPI version](https://badge.fury.io/py/mixture-of-experts.svg)](https://badge.fury.io/py/mixture-of-experts)
+
 ## Install
 
 ```bash
