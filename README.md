@@ -2,7 +2,9 @@
 
 ## Sparsely Gated Mixture of Experts - Pytorch
 
-A Pytorch implementation of Sparsely Gated <a href="https://arxiv.org/abs/2006.16668">Mixture of Experts</a>, for enhancing attention networks. It will pretty much be a line-by-line transcription of the tensorflow implementation <a href="https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/moe.py">here</a>.
+A Pytorch implementation of Sparsely Gated <a href="https://arxiv.org/abs/2006.16668">Mixture of Experts</a>, for massively increasing the capacity (parameter count) of a language model while keeping the computation constant.
+
+It will mostly be a line-by-line transcription of the tensorflow implementation <a href="https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/moe.py">here</a>, with a few enhancements.
 
 ## Install
 
