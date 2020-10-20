@@ -249,7 +249,7 @@ class MoE(nn.Module):
         self.experts = default(experts, lambda: Experts(dim, num_experts = num_experts, hidden_dim = hidden_dim, activation = activation))
         self.loss_coef = loss_coef
 
-    def forward(self, inputs):
+    def forward(self, inputs, **kwargs):
         b, n, d, e = *inputs.shape, self.num_experts
         dispatch_tensor, combine_tensor, loss = self.gate(inputs)
         expert_inputs = torch.einsum('bnd,bnec->ebcd', inputs, dispatch_tensor)
@@ -294,7 +294,7 @@ class HeirarchicalMoE(nn.Module):
         self.experts = default(experts, lambda: Experts(dim, num_experts = num_experts, hidden_dim = hidden_dim, activation = activation))
         self.loss_coef = loss_coef
 
-    def forward(self, inputs):
+    def forward(self, inputs, **kwargs):
         b, n, d, eo, ei = *inputs.shape, self.num_experts_outer, self.num_experts_inner
         dispatch_tensor_outer, combine_tensor_outer, loss_outer = self.gate_outer(inputs)
         expert_inputs_outer = torch.einsum('bnd,bnec->ebcd', inputs, dispatch_tensor_outer)
