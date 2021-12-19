@@ -139,7 +139,7 @@ class Top2Gating(nn.Module):
             equals_one_mask = (importance == 1.).float()
             mask_1 *= equals_one_mask[..., None]
             gate_1 *= equals_one_mask
-            density_1_proxy *= equals_one_mask[..., None]
+            density_1_proxy = density_1_proxy * equals_one_mask[..., None]
             del equals_one_mask
 
         gates_without_top_1 = raw_gates * (1. - mask_1)
