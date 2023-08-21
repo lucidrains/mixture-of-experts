@@ -199,7 +199,6 @@ class Top2Gating(nn.Module):
         # [batch, group]
         position_in_expert_1 = position_in_expert_1.sum(dim=-1)
         # Weight assigned to first expert.  [batch, group]
-        gate_1 *= mask_1_flat
 
         position_in_expert_2 = cumsum_exclusive(mask_2, dim=-2) + mask_1_count
         position_in_expert_2 *= mask_2
@@ -207,7 +206,6 @@ class Top2Gating(nn.Module):
         mask_2_flat = mask_2.sum(dim=-1)
 
         position_in_expert_2 = position_in_expert_2.sum(dim=-1)
-        gate_2 *= mask_2_flat
         
         # [batch, group, experts, expert_capacity]
         combine_tensor = (
